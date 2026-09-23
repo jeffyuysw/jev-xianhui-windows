@@ -126,6 +126,11 @@ class MsgStore:
             self._items.pop(key, None)
         self._notify()
 
+    def get(self, key: str) -> MsgItem | None:
+        """按 key 取一条，用于「点这条消息 → 跳到对应聊天应用」。"""
+        with self._lock:
+            return self._items.get(key)
+
     def clear(self) -> None:
         with self._lock:
             self._items.clear()

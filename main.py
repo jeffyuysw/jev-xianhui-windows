@@ -9,12 +9,26 @@ from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from capture.worker import CaptureWorker
+from capture.window import focus_app_window
 from core.settings import Settings
 from core.store import store
 from resources import asset
 from ui import __version__
 from ui.overlay import PriorityOverlay
 from ui.settings_window import SettingsWindow
+
+
+# 点悬浮窗里某条消息时，要跳到哪个应用 —— 应用名 → 候选进程名。
+# 应用名由 capture/worker.py 的 _app_label() 按进程名归一化，所以这里
+# 能自动区分微信和 QQ，不需要用户额外配置。
+APP_PROCESSES: dict[str, list[str]] = {
+    "微信": ["weixin.exe", "wechat.exe"],
+    "QQ": ["qq.exe", "qqnt.exe"],
+    "TIM": ["tim.exe"],
+    "企业微信": ["wework.exe", "wxwork.exe"],
+    "钉钉": ["dingtalk.exe"],
+    "飞书": ["feishu.exe", "lark.exe"],
+}
 
 
 def _app_icon() -> QIcon:
@@ -160,7 +174,17 @@ class App(QObject):
         pass
 
     def _on_row_tapped(self, key: str) -> None:
-        """A tap drops the row; the user then answers in WeChat themselves."""
+        """点某条消息 → 把对应的聊天应用切到前台，然后这条从列表里去掉。
+
+        用户点它就是要马上去回，所以跳转即视为已处理。找不到对应应用
+        （比如已经退出）时也照样移除，免得留一条点不动的死行。
+        """
+        item = store.get(key)
+        if item is None:
+            return
+        procs = APP_PROCESSES.get(item.app_name)
+        if procs:
+            focus_app_window(procs)
         store.remove(key)
 
     def _on_opacity_changed(self, percent: int) -> None:

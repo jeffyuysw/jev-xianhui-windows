@@ -41,6 +41,34 @@ from .window import capture_window, find_target_window
 # frame to move, so brief messages were silently skipped.
 CHANGE_THRESHOLD = 0.03
 
+# 进程名 → 应用显示名。悬浮窗里显示它，点击某条消息时也靠它决定跳到哪个
+# 应用，所以这里要把常见聊天工具都列上（微信 4.x 是 weixin.exe）。
+_APP_BY_PROCESS = {
+    "weixin.exe": "微信",
+    "wechat.exe": "微信",
+    "qq.exe": "QQ",
+    "qqnt.exe": "QQ",
+    "tim.exe": "TIM",
+    "wework.exe": "企业微信",
+    "wxwork.exe": "企业微信",
+    "dingtalk.exe": "钉钉",
+    "feishu.exe": "飞书",
+    "lark.exe": "飞书",
+}
+
+
+def _app_label(win) -> str:
+    """这条消息来自哪个应用。优先认进程名，标题只作兜底。"""
+    proc = (getattr(win, "process", "") or "").lower()
+    if proc in _APP_BY_PROCESS:
+        return _APP_BY_PROCESS[proc]
+    title = getattr(win, "title", "") or ""
+    if "微信" in title or "WeChat" in title:
+        return "微信"
+    if "QQ" in title:
+        return "QQ"
+    return title or "聊天"
+
 
 class CaptureWorker:
     def __init__(self, settings: Settings, on_status=None) -> None:
@@ -139,7 +167,7 @@ class CaptureWorker:
                     continue
                 self._last_text[key] = parsed.text
 
-                app_name = "微信" if "微信" in win.title or "WeChat" in win.title else win.title
+                app_name = _app_label(win)
                 item = MsgItem(sender=parsed.sender, text=parsed.text, app_name=app_name)
                 is_new = store.upsert(item)
                 if is_new:

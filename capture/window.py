@@ -255,3 +255,75 @@ def client_origin(hwnd: int) -> tuple[int, int]:
     pt = wt.POINT(0, 0)
     user32.ClientToScreen(hwnd, ctypes.byref(pt))
     return pt.x, pt.y
+
+
+# -- 跳到聊天应用 ----------------------------------------------------------
+
+SW_RESTORE = 9
+SW_SHOW = 5
+
+
+def _top_level_windows(processes: set[str]) -> list[WindowInfo]:
+    """按进程名收集顶层窗口，**包括最小化的**。
+
+    和 `_enumerate` 不同，这里刻意不看 IsWindowVisible：最小化的微信同样
+    需要能被切到前台，而 IsWindowVisible 对最小化窗口返回 false。
+    """
+    results: list[WindowInfo] = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wt.HWND, wt.LPARAM)
+    def _enum(hwnd, _lparam):
+        try:
+            ex = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
+            if ex & 0x00000080:  # WS_EX_TOOLWINDOW：托盘提示之类，跳过
+                return True
+            if user32.GetWindow(hwnd, 4):  # GW_OWNER：对话框/子窗口，跳过
+                return True
+            proc = _process_name(hwnd)
+            if proc not in processes:
+                return True
+            length = user32.GetWindowTextLengthW(hwnd)
+            buf = ctypes.create_unicode_buffer(length + 2)
+            user32.GetWindowTextW(hwnd, buf, length + 2)
+            rect = wt.RECT()
+            user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            results.append(WindowInfo(
+                hwnd, buf.value,
+                rect.left, rect.top,
+                rect.right - rect.left, rect.bottom - rect.top,
+                proc))
+        except Exception:
+            pass
+        return True
+
+    user32.EnumWindows(_enum, 0)
+    return results
+
+
+def focus_app_window(processes: list[str]) -> bool:
+    """把指定进程的主窗口切到前台（最小化的会先还原）。成功返回 True。
+
+    Windows 对抢焦点有约束：不是前台进程时 SetForegroundWindow 可能被忽略，
+    所以这里 ShowWindow 还原之后再补一次 SwitchToThisWindow 作为兜底。
+    """
+    procs = {p.lower() for p in processes if p}
+    if not procs:
+        return False
+    wins = _top_level_windows(procs)
+    if not wins:
+        return False
+    # 取面积最大的那个，通常是主窗口
+    win = max(wins, key=lambda wi: wi.width * wi.height)
+
+    user32.ShowWindow(win.hwnd, SW_RESTORE)
+    user32.ShowWindow(win.hwnd, SW_SHOW)
+    ok = bool(user32.SetForegroundWindow(win.hwnd))
+    if not ok:
+        try:
+            user32.SwitchToThisWindow(win.hwnd, True)
+            ok = True
+        except Exception:
+            pass
+    user32.SetFocus(win.hwnd)
+    return ok
+
