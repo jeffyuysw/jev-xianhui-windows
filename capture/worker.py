@@ -142,9 +142,13 @@ class CaptureWorker:
             try:
                 win = find_target_window(titles, procs)
                 if win is None:
-                    self._on_status("没找到微信窗口，打开微信聊天窗口即可")
+                    # 这条提示会显示在悬浮窗顶部：截屏方案要求窗口真实可见，
+                    # 最小化/关闭时读不到画面。
+                    self._on_status("微信窗口需要打开（请不要最小化和关闭）")
                     time.sleep(1.5)
                     continue
+                # 窗口回来了，清掉提示条
+                self._on_status("")
 
                 img = capture_window(win)
                 if img is None:

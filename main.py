@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import sys
+
+# 必须在导入 capture/core/ui 之前切工作目录：开机自启（注册表 Run）拉起时
+# cwd 是 C:\Windows\System32，包就找不到了。切到自己所在目录后，无论从哪
+# 里启动都能正常导入。
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
@@ -72,6 +78,10 @@ class App(QObject):
     # 的线程，这才是正确做法。（已用最小用例实测确认两种方式的差别。）
     _dispatch = Signal(object)
 
+    # 采集线程的状态消息（「没找到微信窗口」之类）经这个信号回到 GUI 线程，
+    # 再由悬浮窗显示成提示条。
+    worker_status = Signal(str)
+
     def __init__(self) -> None:
         super().__init__()
         self.settings = Settings.load()
@@ -85,7 +95,8 @@ class App(QObject):
 
         self.settings_window = SettingsWindow(self.settings)
         self.overlay = PriorityOverlay(self.settings)
-        self.worker = CaptureWorker(self.settings)
+        self.worker = CaptureWorker(self.settings, on_status=self.worker_status.emit)
+        self.worker_status.connect(self._on_worker_status)
 
         self.overlay.row_tapped.connect(self._on_row_tapped)
         self.overlay.closed.connect(self._on_overlay_closed)
@@ -115,6 +126,10 @@ class App(QObject):
             fn()
         except Exception:
             pass  # 单个监听器出错不能拖垮界面
+
+    def _on_worker_status(self, msg: str) -> None:
+        """采集线程的状态 → 悬浮窗顶部提示条。"""
+        self.overlay.set_status_hint(msg)
 
     def _dispatch_to_gui(self, fn) -> None:
         """Run fn on the GUI thread, from any thread."""

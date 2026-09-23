@@ -217,6 +217,7 @@ class PriorityOverlay(QWidget):
         self._card_lay.setContentsMargins(0, 0, 0, 0)
         self._card_lay.setSpacing(0)
         self._card_lay.addWidget(self._build_header())
+        self._card_lay.addWidget(self._build_hint())
         self._card_lay.addWidget(self._build_list())
         self._root.addWidget(self._card)
 
@@ -258,6 +259,38 @@ class PriorityOverlay(QWidget):
         header.mouseMoveEvent = self._header_move  # type: ignore[method-assign]
         header.mouseReleaseEvent = self._header_release  # type: ignore[method-assign]
         return header
+
+    # -- hint --------------------------------------------------------------
+    def _build_hint(self) -> QWidget:
+        """提示条：微信窗口没打开时显示在标题下方。
+
+        平时完全隐藏（不占高度），只有采集线程报「窗口需要打开」时才出现。
+        """
+        self._hint = QLabel("")
+        self._hint.setWordWrap(True)
+        self._hint.setContentsMargins(11, 6, 11, 6)
+        self._hint.setStyleSheet(
+            f"color: #8A5A00; background: #FFF4D6;"
+            f" font-size: {self._font_size - 1:.1f}px; font-family: '{pal_font()}';"
+        )
+        self._hint.hide()
+        return self._hint
+
+    def set_status_hint(self, msg: str) -> None:
+        """由采集线程的状态驱动（经信号回到 GUI 线程后调用）。
+
+        空字符串表示一切正常，收起提示条。
+        """
+        text = (msg or "").strip()
+        # 「正在监听…」这类正常状态不当提示显示，避免闪来闪去。
+        if text in ("正在监听微信窗口…", "已停止监听"):
+            text = ""
+        if text:
+            self._hint.setText(text)
+            self._hint.show()
+        else:
+            self._hint.hide()
+        self._resize_to_content()
 
     # -- list --------------------------------------------------------------
     def _build_list(self) -> QWidget:
@@ -333,7 +366,8 @@ class PriorityOverlay(QWidget):
         if self._collapsed:
             height = HEADER_HEIGHT
         else:
-            height = HEADER_HEIGHT + self._scroll.height() + 2  # +2 for card border
+            hint_h = self._hint.sizeHint().height() if self._hint.isVisible() else 0
+            height = HEADER_HEIGHT + hint_h + self._scroll.height() + 2  # +2 边框
         self.setFixedHeight(height)
         self.adjustSize()
 

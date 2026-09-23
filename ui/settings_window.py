@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core import autostart
 from core.appearance import (
     BG_PRESETS,
     DEFAULT_BG,
@@ -49,6 +50,9 @@ from core.jev_client import JevClient
 from core.msg_item import Bucket
 from core.settings import DEFAULT_ENDPOINT, DEFAULT_MODEL, Settings
 from core.store import store
+
+# 先回官网，显示在设置窗口底部，点击用系统默认浏览器打开。
+SITE_URL = "https://xianhui.xzaigf.dpdns.org"
 
 from .theme import (
     ACCENT,
@@ -379,6 +383,18 @@ class SettingsWindow(QWidget):
         row2.addWidget(self.btn_clear, 1)
         self._lay.addLayout(row2)
 
+        # 开机自动启动：写 HKCU 的 Run 项，不需要管理员权限、不弹 UAC。
+        # 状态以注册表为准（用户也可能从任务管理器里自己关掉）。
+        self.autostart_check = QCheckBox("开机自动启动")
+        self.autostart_check.setCursor(Qt.PointingHandCursor)
+        self.autostart_check.setStyleSheet(
+            f"QCheckBox {{ color: {TEXT}; font-size: 12.5px;"
+            f" font-family: '{FONT_FAMILY}'; spacing: 7px; }}"
+        )
+        self.autostart_check.setChecked(autostart.is_enabled())
+        self.autostart_check.toggled.connect(self._on_autostart_toggled)
+        self._lay.addWidget(self.autostart_check)
+
         self._test_result = QLabel("")
         self._test_result.setWordWrap(True)
         self._test_result.setStyleSheet(
@@ -396,6 +412,18 @@ class SettingsWindow(QWidget):
             f"color: {TEXT_FAINT}; font-size: 11px; font-family: '{FONT_FAMILY}';"
         )
         self._lay.addWidget(ver)
+
+        # 官网入口：QLabel 打开外链交给系统默认浏览器，不需要额外依赖。
+        site = QLabel(
+            f'<a href="{SITE_URL}" style="color:{TEXT_SOFT};'
+            f' text-decoration:none;">官网：{SITE_URL}</a>'
+        )
+        site.setAlignment(Qt.AlignCenter)
+        site.setOpenExternalLinks(True)
+        site.setCursor(Qt.PointingHandCursor)
+        site.setToolTip("点击用浏览器打开先回官网")
+        site.setStyleSheet(f"font-size: 11px; font-family: '{FONT_FAMILY}';")
+        self._lay.addWidget(site)
 
     # -- state -------------------------------------------------------------
     def sync_states(self, window_found: bool | None = None) -> None:
@@ -552,6 +580,18 @@ class SettingsWindow(QWidget):
             self.test_finished.emit(msg)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _on_autostart_toggled(self, checked: bool) -> None:
+        """开关开机自启。写失败就把勾选状态改回去，不骗用户。"""
+        if autostart.set_enabled(checked):
+            self._test_result.setText(
+                "已设为开机自动启动" if checked else "已取消开机自动启动"
+            )
+        else:
+            self.autostart_check.blockSignals(True)
+            self.autostart_check.setChecked(not checked)
+            self.autostart_check.blockSignals(False)
+            self._test_result.setText("开机自启设置失败（可能被安全软件拦截）")
 
 
 def _input_style() -> str:
