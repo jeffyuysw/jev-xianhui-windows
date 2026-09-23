@@ -90,6 +90,34 @@ def _is_sender_like(text: str, median_h: float) -> bool:
     return len(t) <= 12 and " " not in t and "，" not in t and "。" not in t
 
 
+def _chat_header_name(usable: list[OcrLine]) -> str:
+    """聊天窗格顶部那一行的文字：单聊是对方昵称，群聊是群名。
+
+    单聊时微信不会在气泡上方标发送者，只能从这里拿名字；否则每条消息都会
+    落到默认的「对方」。
+
+    注意必须传**还没按分界线裁剪过**的整块文字：实测（微信 4.0，窗口
+    1120x661）会话标题的 x 比图像算出来的分界线还靠左，裁完标题就没了。
+    所以这里直接看最顶部那一带，并取其中最靠右的一个 —— 同一行里左侧通常
+    是搜索框（x≈84），标题在右侧（x≈447）。
+    """
+    if not usable:
+        return ""
+    top_y = min(ln.y for ln in usable)
+    top_h = max((ln.h for ln in usable if ln.y == top_y), default=20) or 20
+    band = [ln for ln in usable if ln.y <= top_y + top_h]
+    if not band:
+        return ""
+    cand = max(band, key=lambda ln: ln.x)
+    text = _HEADER_RE.sub("", cand.text).strip()
+    if not text or len(text) > 24 or text.isdigit():
+        return ""
+    # 搜索框不是标题；OCR 常把「索」认成「素」，两种都挡掉。
+    if "搜索" in text or "搜素" in text:
+        return ""
+    return text
+
+
 def _is_sidebar_furniture(text: str) -> bool:
     t = text.strip()
     if not t:
@@ -186,9 +214,12 @@ def parse(
     lines: list[OcrLine], window_width: int, img: np.ndarray | None = None
 ) -> ParsedMessage | None:
     """Extract the newest incoming message, or None if nothing usable."""
-    usable = [ln for ln in lines if not _is_noise(ln)]
-    if not usable:
+    usable_all = [ln for ln in lines if not _is_noise(ln)]
+    if not usable_all:
         return None
+    # 会话标题必须在按分界线裁剪之前取（标题的 x 可能比分界线还靠左）。
+    header_name = _chat_header_name(usable_all)
+    usable = usable_all
 
     # Drop the session list before anything else, or its rows masquerade as
     # messages (this is what produced "好友" / "折叠置顶聊天" in the overlay).
@@ -241,9 +272,14 @@ def parse(
     group_top = min(ln.y for ln in last)
     group_h = max(ln.y + ln.h for ln in last) - group_top
 
+    # 聊天窗格顶部那一行是会话标题：单聊就是对方的昵称，群聊是群名。
+    # 单聊时微信不给每条气泡标注发送者，所以这里不取名字的话，悬浮窗里
+    # 每条都会显示成默认的「对方」。（header_name 已在函数开头取好，
+    # 因为要在分界线裁剪之前读。）
+    #
     # Strip a leading sender line: only when the bubble holds more than one
     # line, the first line looks like a name, and it is not a wrapped sentence.
-    sender = "对方"
+    sender = header_name or "对方"
     body = last
     if len(last) >= 2:
         first = last[0]
