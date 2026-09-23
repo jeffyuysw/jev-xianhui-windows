@@ -50,6 +50,14 @@ def _fallback_icon() -> QIcon:
 class App(QObject):
     status_message = Signal(str)
 
+    # 把「要在 GUI 线程执行的可调用对象」排队过去。
+    #
+    # 不能用 QTimer.singleShot：它要求调用线程自己有 Qt 事件循环，而采集线程是
+    # 普通 threading.Thread（没有事件循环），定时器永远不会触发 —— 表现为
+    # 「测试连接没有结果」「状态不更新」。跨线程信号则会自动排队到接收者所在
+    # 的线程，这才是正确做法。（已用最小用例实测确认两种方式的差别。）
+    _dispatch = Signal(object)
+
     def __init__(self) -> None:
         super().__init__()
         self.settings = Settings.load()
@@ -59,6 +67,7 @@ class App(QObject):
         # GUI thread, otherwise paints get dropped or the app freezes.
         store.mark_gui_thread()
         store.set_dispatcher(self._dispatch_to_gui)
+        self._dispatch.connect(self._run_on_gui)
 
         self.settings_window = SettingsWindow(self.settings)
         self.overlay = PriorityOverlay(self.settings)
@@ -86,11 +95,16 @@ class App(QObject):
         self._tray: QSystemTrayIcon | None = None
         self._build_tray()
 
+    def _run_on_gui(self, fn) -> None:
+        """信号槽的这一端永远在 GUI 线程，直接调用即可。"""
+        try:
+            fn()
+        except Exception:
+            pass  # 单个监听器出错不能拖垮界面
+
     def _dispatch_to_gui(self, fn) -> None:
         """Run fn on the GUI thread, from any thread."""
-        # QTimer.singleShot queues the callable on the current thread's event
-        # loop; since this runs on the GUI thread, fn lands there too.
-        QTimer.singleShot(0, fn)
+        self._dispatch.emit(fn)
 
     def _build_tray(self) -> None:
         self.tray = QSystemTrayIcon(_app_icon())

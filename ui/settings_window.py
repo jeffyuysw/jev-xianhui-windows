@@ -141,6 +141,11 @@ class SettingsWindow(QWidget):
     # applied without rebuilding the overlay, and it fires on every drag step.
     opacity_changed = Signal(int)         # emits the percentage, 1..100
 
+    # 测试连接的结果要从工作线程送回 GUI 线程。
+    # 不能用 QTimer.singleShot —— 工作线程没有 Qt 事件循环，定时器不会触发，
+    # 结果就永远不显示（这就是「点测试没反应」的原因）。信号会自动排队。
+    test_finished = Signal(str)
+
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._settings = settings
@@ -380,6 +385,8 @@ class SettingsWindow(QWidget):
             f"color: {TEXT_SOFT}; font-size: 11.5px; font-family: '{FONT_FAMILY}';"
         )
         self._lay.addWidget(self._test_result)
+        # 结果从工作线程发过来，自动排队到 GUI 线程执行。
+        self.test_finished.connect(self._test_result.setText)
 
         from . import __version__ as _v  # local import avoids cycle
 
@@ -540,9 +547,9 @@ class SettingsWindow(QWidget):
                 ).probe()
             except Exception as e:
                 msg = f"连接失败：{e}"
-            # This runs on a worker thread; hop back to the GUI thread before
-            # touching widgets, otherwise the paint is dropped.
-            QTimer.singleShot(0, lambda: self._test_result.setText(msg))
+            # 工作线程没有 Qt 事件循环，必须用信号回 GUI 线程；
+            # 早先用 QTimer.singleShot 导致结果永远不显示。
+            self.test_finished.emit(msg)
 
         threading.Thread(target=work, daemon=True).start()
 
