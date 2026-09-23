@@ -1,0 +1,23 @@
+# Judgment kernel - no extra deps (stdlib only)
+
+# Capture layer
+numpy>=1.24
+
+# 锁定 1.2.3，这是刻意的：
+#   rapidocr-onnxruntime 在 PyPI 上的 1.3.x / 1.4.x 全部声明 Requires-Python <3.13，
+#   而本工程支持并实测过 Python 3.13 —— 在 3.13 上唯一能装到的版本就是 1.2.3。
+#   若写 >=1.3.24，Python 3.13 用户 pip install 会直接失败（No matching distribution）。
+#   代码只用到 engine(img) -> (result, elapse) 这个 1.x 通用接口，将来放开 3.13 限制后
+#   可以去掉这个上限，届时请重跑 tests/ 与一次真实截图 OCR 验证。
+rapidocr-onnxruntime==1.2.3
+
+# UI layer
+# 只用到 QtCore / QtGui / QtWidgets，三者都在 Essentials 包里；
+# 若写 PySide6，会连带拉入 PySide6-Addons（WebEngine / 3D / Charts / Multimedia …约 1GB），没必要。
+PySide6-Essentials>=6.6
+
+# Packaging (build only)
+# pyinstaller>=6.0  (installed by the build script)
+
+# Dev / test (optional)
+# pytest>=8.0
