@@ -30,6 +30,11 @@ Dispatcher = Callable[[Callable[[], None]], None]
 
 _BUCKET_ORDER = {Bucket.NOW: 0, Bucket.SOON: 1, Bucket.LATER: 2, Bucket.PENDING: 3}
 
+# 悬浮窗默认展示最近这么多条（用户要求 5 条）。
+# 超出时挤掉最旧的一条，列表不会无限增长；判断结果属于各自那条消息，
+# 所以同一发送者的多条会并排显示，不再互相覆盖。
+MAX_ITEMS = 5
+
 
 class MsgStore:
     def __init__(self) -> None:
@@ -77,6 +82,14 @@ class MsgStore:
                 pass
 
     # -- data --------------------------------------------------------------
+    def _trim_locked(self) -> None:
+        """只保留最近 MAX_ITEMS 条。调用方必须已持锁。"""
+        if len(self._items) <= MAX_ITEMS:
+            return
+        newest = sorted(self._items.values(), key=lambda i: i.time_ms, reverse=True)
+        keep = {i.key for i in newest[:MAX_ITEMS]}
+        self._items = {k: v for k, v in self._items.items() if k in keep}
+
     def upsert(self, item: MsgItem) -> bool:
         """Insert or refresh by key. Returns True if a new row appeared."""
         with self._lock:
@@ -97,6 +110,7 @@ class MsgStore:
                     item.error = existing.error
                 self._items[item.key] = item
                 is_new = False
+            self._trim_locked()
         self._notify()
         return is_new
 
@@ -104,6 +118,7 @@ class MsgStore:
         """Replace without change detection (used after a judgment lands)."""
         with self._lock:
             self._items[item.key] = item
+            self._trim_locked()
         self._notify()
 
     def remove(self, key: str) -> None:

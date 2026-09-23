@@ -29,7 +29,11 @@ BUCKET_LABEL = {
 
 @dataclass
 class MsgItem:
-    """One conversation's latest message. Keyed by sender + conversation."""
+    """One captured message.
+
+    每条消息都是独立的一行 —— 同一个人连发多条也会分别显示，不再折叠。
+    判断结果（urgency / needs_now / …）只属于这一条消息。
+    """
 
     sender: str = ""
     text: str = ""
@@ -47,8 +51,15 @@ class MsgItem:
 
     @property
     def key(self) -> str:
-        """Stable identity: same sender in same app folds into one row."""
-        return f"{self.app_name}|{self.sender}"
+        """每条消息独立成行。
+
+        早先只用了 app_name|sender，同一个人的第二条消息会把第一条覆盖掉，
+        悬浮窗里永远只剩最新一条。现在把到达时间与文本指纹一起编进 key，
+        同一发送者的多条消息就能并存。
+
+        capture 层已经做过一轮「同会话同文本」去重，所以这里不会重复插入。
+        """
+        return f"{self.app_name}|{self.sender}|{self.time_ms}|{self.text[:32]}"
 
     @property
     def bucket(self) -> Bucket:
