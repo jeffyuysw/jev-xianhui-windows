@@ -39,6 +39,9 @@ from core.settings import Settings
 from core.store import store
 
 LIST_MAX_HEIGHT = 340
+# 最多渲染多少行。与 core/store.py 的 MAX_ITEMS 保持一致（5 条），
+# 这里再兜一层，避免 store 上限被调大时列表无限长。
+MAX_ROWS = 5
 EDGE_MARGIN = 6
 ROW_HEIGHT_BASE = 62
 HEADER_HEIGHT = 34
@@ -289,8 +292,10 @@ class PriorityOverlay(QWidget):
             w = self._list_lay.takeAt(1)
             if w and w.widget():
                 w.widget().deleteLater()
-        ordered = [i for i in items if i.bucket != Bucket.LATER] or items
-        ordered = ordered[:8]
+        # 显示全部状态 —— 要马上回 / 尽快 / 可以晚点 / 判断中 都留在列表里。
+        # 早先这里会过滤掉「可以晚点」，用户反馈那样会漏掉消息；现在只按
+        # 紧急度排序（store.all() 已经排好），不做任何丢弃。
+        ordered = items[:MAX_ROWS]
         for i, item in enumerate(ordered):
             row = MessageRow(item, self._pal, self._font_size, self.width())
             row.tapped.connect(self.row_tapped.emit)
@@ -303,7 +308,8 @@ class PriorityOverlay(QWidget):
             self._badge.show()
         else:
             self._badge.hide()
-        self._title.setText("要马上回" if now else "先回")
+        # 标题固定为「先回」：既然现在什么状态都展示，再叫「要马上回」会误导。
+        self._title.setText("先回")
 
         spacing = self._list_lay.spacing()
         rows_h = sum(_row_height(self._font_size) for _ in ordered) + max(0, len(ordered) - 1) * spacing
