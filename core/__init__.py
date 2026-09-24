@@ -8,4 +8,4 @@ Ported from 先回 (Android) - itself a second development of
 https://github.com/jev-chat/jev-chat-jarvis
 """
 
-__version__ = "1.0.1"
+__version__ = "1.0.3"

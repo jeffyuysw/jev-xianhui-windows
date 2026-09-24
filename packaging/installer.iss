@@ -3,7 +3,7 @@
 ;   iscc packaging\installer.iss
 
 #define AppName "先回"
-#define AppVersion "1.0.1"
+#define AppVersion "1.0.3"
 #define AppPublisher "先回"
 #define AppExeName "XianHui.exe"
 
