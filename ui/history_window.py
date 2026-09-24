@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from core import msg_history
 from core.msg_history import Filter, PAGE_SIZE, Record
 
-from .theme import ACCENT, BORDER, FONT_FAMILY, TEXT, TEXT_FAINT, TEXT_SOFT
+from .theme import BORDER, FONT_FAMILY, TEXT, TEXT_FAINT, TEXT_SOFT
 
 # 状态徽章的配色，与悬浮窗的分档颜色保持一致
 _BADGE_COLOR = {
@@ -285,6 +285,15 @@ class HistoryWindow(QWidget):
         self.reload()
 
     def refresh_if_visible(self) -> None:
-        """窗口开着时，有新判断结果就刷新一下。"""
-        if self.isVisible():
-            QTimer.singleShot(0, self.reload)
+        """有新判断结果时被调用（注册为 store 监听器）。
+
+        窗口没开就什么都不做；开着的话重载列表，并**保住滚动位置** —— 否则
+        用户正翻看旧记录时来了新消息，列表会突然跳回顶部。
+        """
+        if not self.isVisible():
+            return
+        bar = self._list.verticalScrollBar()
+        pos = bar.value()
+        self.reload()
+        # reload 会重建列表，滚动条最大值要等布局跑完才更新，所以延后恢复。
+        QTimer.singleShot(0, lambda: bar.setValue(min(pos, bar.maximum())))

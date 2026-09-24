@@ -366,7 +366,10 @@ class PriorityOverlay(QWidget):
         if self._collapsed:
             height = HEADER_HEIGHT
         else:
-            hint_h = self._hint.sizeHint().height() if self._hint.isVisible() else 0
+            # 用 isHidden() 而不是 isVisible()：Qt 里父窗口还没 show() 时，
+            # 子控件的 isVisible() 也是 False，会把提示条高度算成 0，窗口显示
+            # 后又不会重算 —— 结果是提示条被裁掉（实测确认过）。
+            hint_h = self._hint.sizeHint().height() if not self._hint.isHidden() else 0
             height = HEADER_HEIGHT + hint_h + self._scroll.height() + 2  # +2 边框
         self.setFixedHeight(height)
         self.adjustSize()

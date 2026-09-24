@@ -48,7 +48,7 @@ from core.appearance import (
 )
 from core.jev_client import JevClient
 from core.msg_item import Bucket
-from core.settings import DEFAULT_ENDPOINT, DEFAULT_MODEL, Settings
+from core.settings import Settings
 from core.store import store
 
 # 先回官网，显示在设置窗口底部，点击用系统默认浏览器打开。

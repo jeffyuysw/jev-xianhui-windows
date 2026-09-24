@@ -251,12 +251,6 @@ def capture_window(win: WindowInfo) -> np.ndarray | None:
         user32.ReleaseDC(hwnd, hdc_window)
 
 
-def client_origin(hwnd: int) -> tuple[int, int]:
-    pt = wt.POINT(0, 0)
-    user32.ClientToScreen(hwnd, ctypes.byref(pt))
-    return pt.x, pt.y
-
-
 # -- 跳到聊天应用 ----------------------------------------------------------
 
 SW_RESTORE = 9

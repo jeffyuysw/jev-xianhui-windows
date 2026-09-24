@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from capture.worker import CaptureWorker
 from capture.window import focus_app_window
+from core import msg_history
 from core.settings import Settings
 from core.store import store
 from resources import asset
@@ -117,6 +118,9 @@ class App(QObject):
         self.settings_window.opacity_changed.connect(self._on_opacity_changed)
 
         store.add_listener(self.settings_window.sync_states)
+        # 分析记录窗口开着时，新判断结果要立刻出现在列表里
+        # （refresh_if_visible 自己会判断窗口是否可见）。
+        store.add_listener(self.history_window.refresh_if_visible)
 
         # Built once, at startup. (It used to live at the tail of
         # _dispatch_to_gui, which meant a brand-new tray icon was created on
@@ -226,6 +230,11 @@ class App(QObject):
     def quit(self) -> None:
         self.worker.stop()
         self.tray.hide()
+        # 关掉本机记录库的连接，别指望进程退出时系统替我们收尾。
+        try:
+            msg_history.get().close()
+        except Exception:
+            pass
         QApplication.quit()
 
 

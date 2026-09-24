@@ -143,10 +143,6 @@ class MsgStore:
         items.sort(key=lambda i: (_BUCKET_ORDER[i.bucket], -i.time_ms))
         return items
 
-    def pending_judge(self) -> list[MsgItem]:
-        with self._lock:
-            return [i for i in self._items.values() if not i.judged and not i.error]
-
     def count(self) -> int:
         with self._lock:
             return len(self._items)
@@ -154,14 +150,6 @@ class MsgStore:
     def count_bucket(self, bucket: Bucket) -> int:
         with self._lock:
             return sum(1 for i in self._items.values() if i.bucket == bucket)
-
-    def latest_text(self) -> str:
-        """Last captured message text, for dedup against the capture layer."""
-        with self._lock:
-            if not self._items:
-                return ""
-            newest = max(self._items.values(), key=lambda i: i.time_ms)
-            return newest.text
 
 
 # Single shared instance for the whole process.
