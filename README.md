@@ -54,10 +54,6 @@ python -m venv .venv
 
 请在自己拥有或已获授权的设备上使用，遵守各软件用户协议与当地法律法规。
 
-## 来源
-
-复用 [jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) 的判断契约（`noul / choice / score`）；采集思路借鉴 [jev-chat-windows](https://github.com/jev-chat/jev-chat-windows) —— 微信 4.x 界面自绘在 GPU 画布上、UIA 读不到控件，截图 + OCR 是唯一干净的路径；生成层已删除，本应用是纯判断型工具。
-
 ## 许可
 
 [MIT](LICENSE)
