@@ -20,6 +20,7 @@ from core.settings import Settings
 from core.store import store
 from resources import asset
 from ui import __version__
+from ui.history_window import HistoryWindow
 from ui.overlay import PriorityOverlay
 from ui.settings_window import SettingsWindow
 
@@ -95,8 +96,11 @@ class App(QObject):
 
         self.settings_window = SettingsWindow(self.settings)
         self.overlay = PriorityOverlay(self.settings)
+        self.history_window = HistoryWindow()
         self.worker = CaptureWorker(self.settings, on_status=self.worker_status.emit)
         self.worker_status.connect(self._on_worker_status)
+
+        self.settings_window.history_requested.connect(self._show_history)
 
         self.overlay.row_tapped.connect(self._on_row_tapped)
         self.overlay.closed.connect(self._on_overlay_closed)
@@ -211,6 +215,13 @@ class App(QObject):
         self.settings_window.show()
         self.settings_window.raise_()
         self.settings_window.activateWindow()
+
+    def _show_history(self) -> None:
+        """打开「分析记录」。每次打开都重新读，免得看到过期的列表。"""
+        self.history_window.reload()
+        self.history_window.show()
+        self.history_window.raise_()
+        self.history_window.activateWindow()
 
     def quit(self) -> None:
         self.worker.stop()

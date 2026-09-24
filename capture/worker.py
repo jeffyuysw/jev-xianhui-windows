@@ -20,6 +20,7 @@ import time
 
 import numpy as np
 
+from core import msg_history as history
 from core.jev_client import JevClient
 from core.msg_item import MsgItem
 from core.settings import Settings
@@ -173,6 +174,15 @@ class CaptureWorker:
 
                 app_name = _app_label(win)
                 item = MsgItem(sender=parsed.sender, text=parsed.text, app_name=app_name)
+
+                # 先落一条「判断中」的本机记录，判断完成后回填结果。这样即使
+                # 判断失败，分析记录里也能看出这条消息来过、只是没判成功。
+                try:
+                    item.history_id = history.insert_pending(item)
+                    history.trim()
+                except Exception as e:
+                    self._on_status(f"记录写入失败：{e}")
+
                 is_new = store.upsert(item)
                 if is_new:
                     self._on_status(f"新消息来自 {parsed.sender}")
@@ -189,6 +199,7 @@ class CaptureWorker:
         if not s.api_key:
             item.error = "还没填 API Key"
             store.put(item)
+            self._save_history(item)
             return
         try:
             JevClient(s.api_key, s.model, s.endpoint).judge(item)
@@ -196,3 +207,11 @@ class CaptureWorker:
         except Exception as e:
             item.error = f"判断失败：{e}"
         store.put(item)
+        self._save_history(item)
+
+    def _save_history(self, item: MsgItem) -> None:
+        """把判断结果回填到本机记录。失败不影响主流程。"""
+        try:
+            history.fill_result(item.history_id, item)
+        except Exception:
+            pass

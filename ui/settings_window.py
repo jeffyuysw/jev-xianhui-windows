@@ -140,6 +140,7 @@ class SettingsWindow(QWidget):
     stop_requested = Signal()
     clear_requested = Signal()
     overlay_toggle_requested = Signal()
+    history_requested = Signal()          # 顶部「分析记录」入口
     appearance_changed = Signal(object)   # emits the Settings object
     # Opacity travels separately: it is the one appearance control that can be
     # applied without rebuilding the overlay, and it fires on every drag step.
@@ -185,12 +186,30 @@ class SettingsWindow(QWidget):
 
     # -- sections ----------------------------------------------------------
     def _build_header(self) -> None:
+        # 标题行：左边「先回」，最右边是「分析记录」入口。
+        row = QHBoxLayout()
+        row.setSpacing(8)
+
         title = QLabel("先回")
         title.setStyleSheet(
             f"color: {TEXT}; font-size: 19px; font-weight: 700;"
             f" font-family: '{FONT_FAMILY}';"
         )
-        self._lay.addWidget(title)
+        row.addWidget(title)
+        row.addStretch(1)
+
+        self.btn_history = QPushButton("分析记录")
+        self.btn_history.setCursor(Qt.PointingHandCursor)
+        self.btn_history.setToolTip("查看判断过的每一条消息，可按状态筛选")
+        self.btn_history.setStyleSheet(
+            f"QPushButton {{ background: {BG_SOFT}; color: {TEXT};"
+            f" border: 1px solid {BORDER}; border-radius: 9px;"
+            f" padding: 5px 12px; font-size: 12.5px; font-family: '{FONT_FAMILY}'; }}"
+            f"QPushButton:hover {{ background: #EDEBE6; }}"
+        )
+        self.btn_history.clicked.connect(self.history_requested.emit)
+        row.addWidget(self.btn_history)
+        self._lay.addLayout(row)
 
         sub = QLabel("看微信窗口，帮你判断哪条必须马上回。只判断，不代回。")
         sub.setWordWrap(True)

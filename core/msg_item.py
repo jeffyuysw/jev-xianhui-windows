@@ -49,6 +49,9 @@ class MsgItem:
     judged: bool = False
     error: str | None = None
 
+    # 本机分析记录里的行号。消息一到就先落一条「判断中」，判断完成后回填结果。
+    history_id: int = 0
+
     @property
     def key(self) -> str:
         """每条消息独立成行。

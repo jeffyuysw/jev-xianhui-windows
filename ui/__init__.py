@@ -8,4 +8,4 @@ Split so the judgment kernel stays platform-independent:
 See README.md for the second-development attribution.
 """
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
