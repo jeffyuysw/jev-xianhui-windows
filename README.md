@@ -8,6 +8,12 @@
 
 **由 [Jev](https://github.com/typesafeinc/jev) 判断模型驱动**（TypeSafe 的 System One 决策模型，不是大语言模型）—— 它不生成文字，只回答「选哪个 / 打几分 / 是不是」，所以一次判断约 1 秒、约 $0.00004。
 
+### 和 Android 版的区别
+
+同一套判断口径，两条完全不同的采集路径：
+
+![安卓读系统通知，Windows 截屏 + OCR](docs/img/platforms.jpg)
+
 ## 界面预览
 
 ![设置窗口](docs/img/settings.png)
